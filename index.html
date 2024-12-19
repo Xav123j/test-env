@@ -1,10 +1,12 @@
 <!DOCTYPE html>
 <html lang="en">
+<!-- Keep your existing head section exactly as is -->
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Radio Test Player</title>
     <style>
+        /* Keep your existing styles */
         .video {
             font-family: sans-serif;
         }
@@ -34,12 +36,25 @@
             margin-left: -10px;
             cursor: pointer;
         }
+
+        /* Add new debug styles */
+        .event-log {
+            max-height: 200px;
+            overflow-y: auto;
+            background: #fff;
+            padding: 10px;
+            margin-top: 10px;
+            border: 1px solid #ddd;
+            font-family: monospace;
+            font-size: 12px;
+        }
     </style>
 </head>
 <body>
+    <!-- Keep your existing container and BBC structure exactly as is -->
     <div class="container">
-        <!-- Mirror BBC's exact structure -->
         <body class="video font-family-sans transparent audioUI svg">
+            <!-- Keep all your existing BBC player structure -->
             <div id="p_background"></div>
             <div id="p_alert" role="alert"></div>
             <div id="mediaContainer" class="mediaContainer seekingBarNotFullyAvailable">
@@ -68,34 +83,23 @@
         </body>
     </div>
 
-    <!-- Debug Panel -->
+    <!-- Updated Debug Panel -->
     <div style="margin-top: 20px; padding: 10px; background: #f0f0f0;">
         <h2>Debug Information</h2>
         <div id="debug-info">
             <div>Current Time: <span id="current-time">0</span></div>
             <div>Seekable Range: <span id="seekable-range">0 - 0</span></div>
             <div>Last Command: <span id="last-command">None</span></div>
+            <div>Ready State: <span id="ready-state">0</span></div>
+            <div>Network State: <span id="network-state">0</span></div>
+            <div>Error: <span id="error-state">None</span></div>
+            <div>Buffered: <span id="buffered-ranges">None</span></div>
+            <div class="event-log" id="event-log"></div>
         </div>
     </div>
 
     <script>
-        // Update debug info
-        function updateDebugInfo() {
-            const audio = document.getElementById('p_a_player_0');
-            if (audio.seekable && audio.seekable.length > 0) {
-                document.getElementById('current-time').textContent = audio.currentTime.toFixed(2);
-                document.getElementById('seekable-range').textContent = 
-                    `${audio.seekable.start(0).toFixed(2)} - ${audio.seekable.end(0).toFixed(2)}`;
-            }
-        }
-
-        // Set up audio element listeners
-        const audio = document.getElementById('p_a_player_0');
-        audio.addEventListener('timeupdate', updateDebugInfo);
-        audio.addEventListener('seeked', updateDebugInfo);
-        audio.addEventListener('loadedmetadata', updateDebugInfo);
-
-        // Mirror BBC's performPageActions
+        // Keep your existing performPageActions function
         window.performPageActions = async (final_radio_position, capture_timestamp) => {
             document.getElementById('last-command').textContent = 
                 `Position: ${final_radio_position}, Capture: ${capture_timestamp}`;
@@ -120,6 +124,66 @@
                 console.error('[ERROR]', error);
             }
         };
+
+        // Enhanced debug functionality
+        const audio = document.getElementById('p_a_player_0');
+        const eventLog = document.getElementById('event-log');
+
+        function logEvent(event, details = '') {
+            const time = new Date().toLocaleTimeString();
+            const logEntry = document.createElement('div');
+            logEntry.textContent = `${time}: ${event} ${details}`;
+            eventLog.insertBefore(logEntry, eventLog.firstChild);
+        }
+
+        function updateDebugInfo() {
+            if (audio.seekable && audio.seekable.length > 0) {
+                document.getElementById('current-time').textContent = audio.currentTime.toFixed(2);
+                document.getElementById('seekable-range').textContent = 
+                    `${audio.seekable.start(0).toFixed(2)} - ${audio.seekable.end(0).toFixed(2)}`;
+            }
+            
+            document.getElementById('ready-state').textContent = `${audio.readyState} (${getReadyStateText(audio.readyState)})`;
+            document.getElementById('network-state').textContent = `${audio.networkState} (${getNetworkStateText(audio.networkState)})`;
+            document.getElementById('error-state').textContent = audio.error ? `${audio.error.code} (${getErrorText(audio.error.code)})` : 'None';
+            
+            if (audio.buffered.length > 0) {
+                const ranges = [];
+                for (let i = 0; i < audio.buffered.length; i++) {
+                    ranges.push(`${audio.buffered.start(i).toFixed(2)} - ${audio.buffered.end(i).toFixed(2)}`);
+                }
+                document.getElementById('buffered-ranges').textContent = ranges.join(', ');
+            }
+        }
+
+        function getReadyStateText(state) {
+            const states = ['HAVE_NOTHING', 'HAVE_METADATA', 'HAVE_CURRENT_DATA', 'HAVE_FUTURE_DATA', 'HAVE_ENOUGH_DATA'];
+            return states[state] || 'UNKNOWN';
+        }
+
+        function getNetworkStateText(state) {
+            const states = ['NETWORK_EMPTY', 'NETWORK_IDLE', 'NETWORK_LOADING', 'NETWORK_NO_SOURCE'];
+            return states[state] || 'UNKNOWN';
+        }
+
+        function getErrorText(code) {
+            const errors = ['', 'MEDIA_ERR_ABORTED', 'MEDIA_ERR_NETWORK', 'MEDIA_ERR_DECODE', 'MEDIA_ERR_SRC_NOT_SUPPORTED'];
+            return errors[code] || 'UNKNOWN_ERROR';
+        }
+
+        // Monitor all relevant events
+        ['loadstart', 'progress', 'suspend', 'abort', 'error', 'emptied', 'stalled', 
+         'loadedmetadata', 'loadeddata', 'canplay', 'canplaythrough', 'playing', 'waiting',
+         'seeking', 'seeked', 'ended', 'durationchange', 'timeupdate', 'play', 'pause'
+        ].forEach(eventName => {
+            audio.addEventListener(eventName, (e) => {
+                logEvent(eventName);
+                updateDebugInfo();
+            });
+        });
+
+        // Update debug info every second
+        setInterval(updateDebugInfo, 1000);
     </script>
 </body>
 </html>
