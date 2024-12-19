@@ -1,12 +1,11 @@
 <!DOCTYPE html>
 <html lang="en">
-<!-- Keep your existing head section exactly as is -->
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Radio Test Player</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/flv.js/1.6.2/flv.min.js"></script>
     <style>
-        /* Keep your existing styles */
         .video {
             font-family: sans-serif;
         }
@@ -36,8 +35,6 @@
             margin-left: -10px;
             cursor: pointer;
         }
-
-        /* Add new debug styles */
         .event-log {
             max-height: 200px;
             overflow-y: auto;
@@ -51,18 +48,12 @@
     </style>
 </head>
 <body>
-    <!-- Keep your existing container and BBC structure exactly as is -->
     <div class="container">
         <body class="video font-family-sans transparent audioUI svg">
-            <!-- Keep all your existing BBC player structure -->
             <div id="p_background"></div>
             <div id="p_alert" role="alert"></div>
             <div id="mediaContainer" class="mediaContainer seekingBarNotFullyAvailable">
-                <audio id="p_a_player_0" preload="auto" autoplay aria-hidden="true">
-                    <source src="http://localhost:8000/live/stream.flv" type="video/x-flv">
-                    <source src="http://localhost:8000/live/stream/index.m3u8" type="application/x-mpegURL">
-                    <source src="http://localhost:8000/api/streams/live/stream" type="audio/aac">
-                </audio>
+                <audio id="p_a_player_0" preload="auto" controls aria-hidden="true"></audio>
                 <video webkit-playsinline playsinline preload="metadata" tabindex="-1" id="p_player_0" aria-hidden="true" class="p_transform" style="left: -9999px;"></video>
                 <ul class="p_contextMenu" style="display: none;"></ul>
                 <div aria-live="polite" role="region" class="p_subtitlesContainer" style="opacity: 1; width: 100%; height: 100%;"></div>
@@ -85,7 +76,7 @@
         </body>
     </div>
 
-    <!-- Updated Debug Panel -->
+    <!-- Debug Panel -->
     <div style="margin-top: 20px; padding: 10px; background: #f0f0f0;">
         <h2>Debug Information</h2>
         <div id="debug-info">
@@ -101,33 +92,27 @@
     </div>
 
     <script>
-        // Keep your existing performPageActions function
-        window.performPageActions = async (final_radio_position, capture_timestamp) => {
-            document.getElementById('last-command').textContent = 
-                `Position: ${final_radio_position}, Capture: ${capture_timestamp}`;
-            
-            try {
-                if (audio.seekable && audio.seekable.length > 0) {
-                    const serverTimeAsClientTime = Date.now();
-                    const roundtrip_latency = serverTimeAsClientTime - capture_timestamp;
-                    
-                    const streamStartTimestamp = audio.seekable.start(0) * 1000;
-                    const targetPosition = final_radio_position - streamStartTimestamp;
-                    const targetTimeInSeconds = (targetPosition / 1000) + (roundtrip_latency / 1000);
+        // FLV.js setup
+        if (flvjs.isSupported()) {
+            const player = document.getElementById('p_a_player_0');
+            const flvPlayer = flvjs.createPlayer({
+                type: 'flv',
+                url: 'http://localhost:8000/live/stream.flv',
+                isLive: true,
+                hasAudio: true,
+                hasVideo: false
+            });
+            flvPlayer.attachMediaElement(player);
+            flvPlayer.load();
+            flvPlayer.play();
 
-                    if (isFinite(targetTimeInSeconds) && 
-                        targetTimeInSeconds >= audio.seekable.start(0) && 
-                        targetTimeInSeconds <= audio.seekable.end(0)) {
-                        audio.currentTime = targetTimeInSeconds;
-                        console.log(`[SUCCESS] Set playback to ${targetTimeInSeconds}s`);
-                    }
-                }
-            } catch (error) {
-                console.error('[ERROR]', error);
-            }
-        };
+            // Add FLV.js error handling
+            flvPlayer.on(flvjs.Events.ERROR, (errorType, errorDetail) => {
+                logEvent('FLV.js Error', `Type: ${errorType}, Detail: ${errorDetail}`);
+            });
+        }
 
-        // Enhanced debug functionality
+        // Debug functionality
         const audio = document.getElementById('p_a_player_0');
         const eventLog = document.getElementById('event-log');
 
@@ -186,6 +171,32 @@
 
         // Update debug info every second
         setInterval(updateDebugInfo, 1000);
+
+        // Keep original performPageActions function
+        window.performPageActions = async (final_radio_position, capture_timestamp) => {
+            document.getElementById('last-command').textContent = 
+                `Position: ${final_radio_position}, Capture: ${capture_timestamp}`;
+            
+            try {
+                if (audio.seekable && audio.seekable.length > 0) {
+                    const serverTimeAsClientTime = Date.now();
+                    const roundtrip_latency = serverTimeAsClientTime - capture_timestamp;
+                    
+                    const streamStartTimestamp = audio.seekable.start(0) * 1000;
+                    const targetPosition = final_radio_position - streamStartTimestamp;
+                    const targetTimeInSeconds = (targetPosition / 1000) + (roundtrip_latency / 1000);
+
+                    if (isFinite(targetTimeInSeconds) && 
+                        targetTimeInSeconds >= audio.seekable.start(0) && 
+                        targetTimeInSeconds <= audio.seekable.end(0)) {
+                        audio.currentTime = targetTimeInSeconds;
+                        console.log(`[SUCCESS] Set playback to ${targetTimeInSeconds}s`);
+                    }
+                }
+            } catch (error) {
+                console.error('[ERROR]', error);
+            }
+        };
     </script>
 </body>
 </html>
