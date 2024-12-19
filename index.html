@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Radio Test Player</title>
+    <style>
+        .video {
+            font-family: sans-serif;
+        }
+        .mediaContainer {
+            position: relative;
+        }
+        .p_audioui_container {
+            display: block;
+        }
+        .p_bar {
+            position: relative;
+        }
+        .p_progressBar {
+            height: 4px;
+            background: rgba(0,0,0,0.2);
+        }
+        .p_progressBarAvailable {
+            background: rgba(0,0,0,0.4);
+        }
+        .p_seekThumb {
+            position: absolute;
+            width: 20px;
+            height: 20px;
+            background: #fff;
+            border-radius: 50%;
+            top: -8px;
+            margin-left: -10px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Mirror BBC's exact structure -->
+        <body class="video font-family-sans transparent audioUI svg">
+            <div id="p_background"></div>
+            <div id="p_alert" role="alert"></div>
+            <div id="mediaContainer" class="mediaContainer seekingBarNotFullyAvailable">
+                <audio id="p_a_player_0" preload="auto" aria-hidden="true">
+                    <source src="http://localhost:8000/live/stream" type="audio/mpeg">
+                </audio>
+                <video webkit-playsinline playsinline preload="metadata" tabindex="-1" id="p_player_0" aria-hidden="true" class="p_transform" style="left: -9999px;"></video>
+                <ul class="p_contextMenu" style="display: none;"></ul>
+                <div aria-live="polite" role="region" class="p_subtitlesContainer" style="opacity: 1; width: 100%; height: 100%;"></div>
+                <div id="p_audioui_container" style="display: block;">
+                    <div id="p_audioui_coreControls"></div>
+                    <div class="p_volumeControls p_closed" aria-hidden="false"></div>
+                    <div id="p_audioui_rightRegionControls"></div>
+                    <div class="p_playerSeekBarHolder" aria-hidden="false" style="opacity: 1;">
+                        <div class="p_bar p_seekBar">
+                            <div class="p_bar p_progressBar p_progressBarAvailable"></div>
+                            <div class="p_bar p_progressBar" style="right: 1174px;"></div>
+                            <button class="p_button p_seekThumb" title="Seek bar" aria-label="Seek bar" role="slider" aria-valuemin="0" aria-valuemax="100">
+                                <div class="p_seekThumbLine"></div>
+                                <div class="p_seekThumbHalo"></div>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </body>
+    </div>
+
+    <!-- Debug Panel -->
+    <div style="margin-top: 20px; padding: 10px; background: #f0f0f0;">
+        <h2>Debug Information</h2>
+        <div id="debug-info">
+            <div>Current Time: <span id="current-time">0</span></div>
+            <div>Seekable Range: <span id="seekable-range">0 - 0</span></div>
+            <div>Last Command: <span id="last-command">None</span></div>
+        </div>
+    </div>
+
+    <script>
+        // Update debug info
+        function updateDebugInfo() {
+            const audio = document.getElementById('p_a_player_0');
+            if (audio.seekable && audio.seekable.length > 0) {
+                document.getElementById('current-time').textContent = audio.currentTime.toFixed(2);
+                document.getElementById('seekable-range').textContent = 
+                    `${audio.seekable.start(0).toFixed(2)} - ${audio.seekable.end(0).toFixed(2)}`;
+            }
+        }
+
+        // Set up audio element listeners
+        const audio = document.getElementById('p_a_player_0');
+        audio.addEventListener('timeupdate', updateDebugInfo);
+        audio.addEventListener('seeked', updateDebugInfo);
+        audio.addEventListener('loadedmetadata', updateDebugInfo);
+
+        // Mirror BBC's performPageActions
+        window.performPageActions = async (final_radio_position, capture_timestamp) => {
+            document.getElementById('last-command').textContent = 
+                `Position: ${final_radio_position}, Capture: ${capture_timestamp}`;
+            
+            try {
+                if (audio.seekable && audio.seekable.length > 0) {
+                    const serverTimeAsClientTime = Date.now();
+                    const roundtrip_latency = serverTimeAsClientTime - capture_timestamp;
+                    
+                    const streamStartTimestamp = audio.seekable.start(0) * 1000;
+                    const targetPosition = final_radio_position - streamStartTimestamp;
+                    const targetTimeInSeconds = (targetPosition / 1000) + (roundtrip_latency / 1000);
+
+                    if (isFinite(targetTimeInSeconds) && 
+                        targetTimeInSeconds >= audio.seekable.start(0) && 
+                        targetTimeInSeconds <= audio.seekable.end(0)) {
+                        audio.currentTime = targetTimeInSeconds;
+                        console.log(`[SUCCESS] Set playback to ${targetTimeInSeconds}s`);
+                    }
+                }
+            } catch (error) {
+                console.error('[ERROR]', error);
+            }
+        };
+    </script>
+</body>
+</html>
