@@ -90,8 +90,23 @@
             <div class="event-log" id="event-log"></div>
         </div>
     </div>
-
+    <script src="whistle.js"></script>
+    
     <script>
+        // Initialize whistle detection
+        whistle.init("whistleDetected", false, "high");
+        
+        // Listen for whistle detected event
+        document.addEventListener("whistleDetected", () => {
+          console.log("Whistle detected!");
+        });
+        
+        // Listen for whistle ready event
+        document.addEventListener("whistleReady", () => {
+          console.log("Whistle detection is ready!");
+        });
+
+        
         // FLV.js setup
         if (flvjs.isSupported()) {
             const player = document.getElementById('p_a_player_0');
