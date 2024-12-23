@@ -93,18 +93,8 @@
     <script src="whistle.js"></script>
     
     <script>
-        // Initialize whistle detection
-        whistle.init("whistleDetected", false, "high");
-        
-        // Listen for whistle detected event
-        document.addEventListener("whistleDetected", () => {
-          console.log("Whistle detected!");
-        });
-        
-        // Listen for whistle ready event
-        document.addEventListener("whistleReady", () => {
-          console.log("Whistle detection is ready!");
-        });
+      whistle.init();
+      document.addEventListener("whistle", function() { console.log("whistled!"); }, false);
 
         
         // FLV.js setup
