@@ -1,36 +1,72 @@
 /*
-  whistle.js - whistle detector modified to take input from the first audio element on the page
+  whistle.js - whistle detector
+  url/latest source: https://github.com/skycocker/whistle.js
+
+  Copyright 2013 Michal Siwek
+  Released under the terms of GNU General Public License (version 3 or later) (http://www.gnu.org/licenses/gpl.txt)
 */
 
-(function (window, document) {
+(function(window, document, navigator) {
   window.requestAnimationFrame = window.requestAnimationFrame ||
-    window.msRequestAnimationFrame ||
-    window.mozRequestAnimationFrame ||
-    window.webkitRequestAnimationFrame;
+                                 window.msRequestAnimationFrame ||
+                                 window.mozRequestAnimationFrame ||
+                                 window.webkitRequestAnimationFrame;
 
-  window.AudioContext = window.AudioContext || window.webkitAudioContext;
+  window.AudioContext = window.AudioContext ||
+                        window.webkitAudioContext;
+
+  navigator.getUserMedia = navigator.getUserMedia ||
+                           navigator.webkitGetUserMedia ||
+                           navigator.mozGetUserMedia ||
+                           navigator.msGetUserMedia;
 
   var actx = new AudioContext();
-  var audioElement = null,
-    sourceNode = null,
-    analyser = null;
+  var audioInput = null,
+      rawAudioInput = null,
+      inputNode = null,
+      analyser = null;
+
+  var whistleEvent = null,
+      whistleReadyEvent = null;
 
   function Whistle() {
-    this.init = function (whistleEventName, once, precision) {
+    this.init = function(whistleEventName, once, precision) {
       this.whistleEventName = whistleEventName || "whistle";
       this.once = once || false;
 
       this.whistling = null;
       this.intensity = null;
 
-      if (precision === "low") {
+      if(precision == "low") {
         this.precision = 150;
       } else {
         this.precision = 250;
       }
 
-      // Get the first audio element on the page
-      audioElement = document.querySelector("audio");
+      navigator.getUserMedia({ audio: true }, startStream, function(error) {
+        console.log("error: " + error);
+      });
+
+      whistleEvent = new CustomEvent(
+        this.whistleEventName, {
+          bubbles: true,
+          cancelable: true
+        }
+      );
+
+      whistleReadyEvent = new CustomEvent(
+        'whistleReady', {
+          bubbles: true,
+          cancelable: true
+        }
+      );
+    }
+  }     
+
+  var whistle = window.whistle = new Whistle();
+
+
+   audioElement = document.querySelector("audio");
       if (!audioElement) {
         console.error("No audio element found on the page.");
         return;
@@ -38,23 +74,23 @@
 
       // Connect the audio element to the analyser
       startStream();
+  function startStream(audioElement) {
+    inputNode = actx.createGain();
 
-      // Dispatch a ready event when initialized
-      const whistleReadyEvent = new Event("whistleReady");
-      document.dispatchEvent(whistleReadyEvent);
-    };
-  }
-
-  var whistle = (window.whistle = new Whistle());
-
-  function startStream() {
-    sourceNode = actx.createMediaElementSource(audioElement);
+    rawAudioInput = actx.createMediaStreamSource(audioElement);
+    audioInput = rawAudioInput;
+    audioInput.connect(inputNode);
 
     analyser = actx.createAnalyser();
     analyser.fftSize = 2048;
 
-    sourceNode.connect(analyser);
-    analyser.connect(actx.destination); // Optional: Connect to destination if playback is needed
+    inputNode.connect(analyser);
+
+    zeroGain = actx.createGain();
+    zeroGain.gain.value = 0.0;
+    //inputNode.connect(actx.destination); //uncomment this to get the mic playback from speakers
+
+    document.dispatchEvent(whistleReadyEvent);
 
     analyse();
   }
@@ -63,20 +99,17 @@
     var frequencies = new Uint8Array(analyser.frequencyBinCount);
     analyser.getByteFrequencyData(frequencies);
 
-    for (var i = 29; i <= 80; ++i) {
-      if (frequencies[i] > whistle.precision) {
-        // Dispatch a whistle event
-        const whistleEvent = new Event(whistle.whistleEventName);
+    for(var i=29; i<=80; ++i) {
+      if(frequencies[i] > whistle.precision) {
         document.dispatchEvent(whistleEvent);
-
         whistle.whistling = true;
         whistle.intensity = (i - 29) * 2;
       } else {
         whistle.whistling = false;
       }
     }
-    if (!whistle.once) {
+    if(!whistle.once) {
       requestAnimationFrame(analyse);
     }
   }
-})(window, document);
+})(window, document, navigator)
